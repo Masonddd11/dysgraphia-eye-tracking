@@ -40,12 +40,19 @@ def layout_paragraph(
     max_width_px: int = 1280,
     margin_px: int = 100,
     line_spacing: float = 1.8,
+    top_px: int | None = None,
 ) -> LayoutResult:
-    """Greedy word-wrap layout; every word gets a screen-space bounding box."""
+    """Greedy word-wrap layout; every word gets a screen-space bounding box.
+
+    ``margin_px`` is the left/right margin; ``top_px`` overrides the vertical
+    origin (defaults to ``margin_px``) so a centred column can start higher
+    than its horizontal margin.
+    """
     words = text.split()
     (_, sample_h), _ = cv2.getTextSize("Ag", font, font_scale, thickness)
     line_height = sample_h * line_spacing
     usable_right = max_width_px - margin_px
+    top = margin_px if top_px is None else top_px
 
     boxes: list[WordBox] = []
     space_w = cv2.getTextSize("x x", font, font_scale, thickness)[0][0] - 2 * cv2.getTextSize(
@@ -57,7 +64,7 @@ def layout_paragraph(
         if x > margin_px and x + w > usable_right:
             x = float(margin_px)
             line += 1
-        boxes.append(WordBox(word, i, x, margin_px + line * line_height, float(w), float(h), line))
+        boxes.append(WordBox(word, i, x, top + line * line_height, float(w), float(h), line))
         x += w + space_w
     return LayoutResult(boxes, line_height)
 

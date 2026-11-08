@@ -59,3 +59,7 @@ def test_render_paragraph_draws_words_and_highlight():
 
     assert not np.array_equal(plain, highlighted)  # highlight visibly changes pixels
     assert plain.sum() > 0  # words were drawn
+
+def test_layout_top_px_overrides_vertical_origin():
+    layout = layout_paragraph(TEXT, FONT, 1.0, 2, 400, 20, top_px=300)
+    assert min(b.y for b in layout.boxes) == 300

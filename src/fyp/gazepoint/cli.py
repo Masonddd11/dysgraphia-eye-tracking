@@ -26,7 +26,12 @@ import cv2
 import numpy as np
 import pylsl
 
-from fyp.gazepoint.client import OpenGazeClient, OpenGazeError
+from fyp.gazepoint.client import (
+    DEFAULT_TEXT_WIDTH_FRACTION,
+    OpenGazeClient,
+    OpenGazeError,
+    text_area_points,
+)
 from fyp.gazepoint.lsl import GazePointOutlet
 from fyp.webcam.stimulus import layout_paragraph, render_paragraph, word_at
 
@@ -47,6 +52,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--screen-h", type=int, default=0, help="override screen height px (0 = query server)")
     p.add_argument("--duration", type=float, default=0.0, help="seconds; 0 = until Ctrl-C")
     p.add_argument("--calibrate", action="store_true", help="run device calibration and exit")
+    p.add_argument(
+        "--area",
+        choices=("text", "full"),
+        default="text",
+        help="calibration grid: centred text column (default) or full screen",
+    )
+    p.add_argument(
+        "--text-width",
+        type=int,
+        default=0,
+        help="stimulus column width px (0 = 47 percent of screen); matched by --area text",
+    )
     p.add_argument("--stimulus", type=Path, default=None, help="text file with the paragraph to display")
     p.add_argument("--smooth", type=float, default=0.6, help="preview EMA alpha (0..1); LSL stays raw")
     p.add_argument("--headless", action="store_true", help="no preview window, stats to stdout")
@@ -80,8 +97,16 @@ def run_calibration(args: argparse.Namespace) -> int:
     try:
         pid = client.product_id()
         print(f"tracker: {pid or 'unknown'}")
+        points = None
+        if args.area == "text":
+            resolved = _resolve_screen(client, args)
+            if resolved is None:
+                print("ERROR: no screen size; pass --screen-w/--screen-h.")
+                return 2
+            points = text_area_points(resolved[0], args.text_width)
+            print(f"calibration area: centred text column, {len(points)} points")
         print("calibration: fixate each on-screen point; sit at the normal reading distance.")
-        ave_error, valid_points = client.calibrate()
+        ave_error, valid_points = client.calibrate(points=points)
         print(
             f"calibration done: {valid_points} valid points, "
             f"average error {ave_error} (device-reported)"
@@ -133,12 +158,30 @@ def run_session(args: argparse.Namespace) -> int:
     font, font_scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.0, 2
     if args.stimulus is not None:
         font_scale = 0.9 * sh / 900.0
+        column = args.text_width if args.text_width > 0 else int(sw * DEFAULT_TEXT_WIDTH_FRACTION)
+        column = max(200, min(int(sw), column))
+        margin_x = (int(sw) - column) // 2
         layout = layout_paragraph(
-            args.stimulus.read_text(), font, font_scale, thickness, int(sw), int(sw * 0.08)
+            args.stimulus.read_text(),
+            font,
+            font_scale,
+            thickness,
+            int(sw),
+            margin_x,
+            top_px=0,
         )
+        if layout.boxes:
+            block_top = min(b.y for b in layout.boxes)
+            block_bottom = max(b.y + b.h for b in layout.boxes)
+            offset = int((sh - (block_bottom - block_top)) / 2 - block_top)
+            for box in layout.boxes:
+                box.y += offset
         word_tol = layout.line_height * 0.75
         n_lines = 1 + (layout.boxes[-1].line if layout.boxes else 0)
-        print(f"stimulus: {len(layout.boxes)} words / {n_lines} lines from {args.stimulus}")
+        print(
+            f"stimulus: {len(layout.boxes)} words / {n_lines} lines from {args.stimulus} "
+            f"(column {column:.0f}px)"
+        )
         if not args.headless:
             cv2.namedWindow("stimulus", cv2.WINDOW_NORMAL)
             cv2.setWindowProperty("stimulus", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)

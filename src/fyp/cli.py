@@ -56,6 +56,10 @@ def _calibrate_cmd(args: argparse.Namespace) -> list[str]:
         args.host,
         "--port",
         str(args.port),
+        "--area",
+        args.area,
+        "--text-width",
+        str(args.text_width),
         "--calibrate",
     ]
 
@@ -71,6 +75,8 @@ def _gazepoint_cmd(args: argparse.Namespace, *, with_stimulus: bool) -> list[str
         str(args.port),
         "--rate",
         str(args.rate),
+        "--text-width",
+        str(args.text_width),
     ]
     stimulus = _abs(args.stimulus) if with_stimulus else None
     if stimulus:
@@ -139,6 +145,7 @@ def _smoke_args() -> argparse.Namespace:
         host="127.0.0.1",
         port=4242,
         rate=150.0,
+        text_width=0,
     )
 
 
@@ -162,6 +169,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     cal = sub.add_parser("calibrate", aliases=["cal"], help="Gazepoint on-device calibration")
     cal.add_argument("--host", default="127.0.0.1")
     cal.add_argument("--port", type=int, default=4242)
+    cal.add_argument(
+        "--area", choices=("text", "full"), default="text", help="calibration grid area"
+    )
+    cal.add_argument(
+        "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
+    )
 
     gaze = sub.add_parser("gaze", aliases=["g"], help="Gazepoint gaze stream (research tracker)")
     gaze.add_argument("--duration", type=float, default=0.0, help="seconds; 0 = until Ctrl-C")
@@ -170,6 +183,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     gaze.add_argument("--host", default="127.0.0.1")
     gaze.add_argument("--port", type=int, default=4242)
     gaze.add_argument("--rate", type=float, default=150.0, help="LSL nominal rate (GP3 HD = 150)")
+    gaze.add_argument(
+        "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
+    )
 
     cam = sub.add_parser("webcam", aliases=["w"], help="webcam head-pose/gaze stream")
     _add_webcam_options(cam)
@@ -181,6 +197,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     both.add_argument("--host", default="127.0.0.1")
     both.add_argument("--port", type=int, default=4242)
     both.add_argument("--rate", type=float, default=150.0)
+    both.add_argument(
+        "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
+    )
 
     sub.add_parser("smoke", aliases=["s"], help="both sensors, 8 s, headless")
     sub.add_parser("test", aliases=["t"], help="run the offline test suite")

@@ -12,10 +12,10 @@ import socket
 import threading
 import time
 from collections import deque
+from collections.abc import Sequence
 
 from fyp.gazepoint.protocol import (
     ACK,
-    CAL,
     REC,
     GazePoint,
     Record,
@@ -29,9 +29,38 @@ from fyp.gazepoint.protocol import (
 _ACK_TIMEOUT_S = 5.0
 _SAMPLE_BUFFER = 6000  # ~40 s at 150 Hz
 
+DEFAULT_TEXT_WIDTH_FRACTION = 0.47  # centred stimulus column vs screen width
+_CALIBRATION_ROWS = (0.30, 0.50, 0.70)
+_CALIBRATION_INSET = 0.10
+
 
 class OpenGazeError(RuntimeError):
     """Raised on connection/acknowledgement failures."""
+
+
+def text_area_points(
+    screen_w: float, text_width_px: float | None = None
+) -> list[tuple[float, float]]:
+    """3x3 calibration grid confined to the centred text column (screen fractions).
+
+    Gazepoint's stock grid spans x=0.1..0.9, which on an ultrawide places the
+    outer points ~30 deg off-axis where the tracker is least accurate.
+    Calibrating only the column the stimulus uses keeps the fit where the words
+    are; gaze outside that column will be less accurate by design.
+    """
+    width = float(text_width_px) if text_width_px else float(screen_w) * DEFAULT_TEXT_WIDTH_FRACTION
+    width = min(max(width, 200.0), float(screen_w))
+    column = width / float(screen_w)
+    xs = (
+        0.5 - column / 2 + _CALIBRATION_INSET * column,
+        0.5,
+        0.5 + column / 2 - _CALIBRATION_INSET * column,
+    )
+    ys = _CALIBRATION_ROWS
+    # Gazepoint's default order is centre first, then clockwise from top-right;
+    # match it so the UI and the fitted samples stay index-aligned.
+    order = ((1, 1), (2, 0), (2, 1), (2, 2), (1, 2), (0, 2), (0, 1), (0, 0), (1, 0))
+    return [(min(max(xs[c], 0.05), 0.95), ys[r]) for c, r in order]
 
 
 class OpenGazeClient:
@@ -136,16 +165,6 @@ class OpenGazeClient:
     def enable(self, cmd_id: str, state: bool = True) -> None:
         self.set(cmd_id, STATE="1" if state else "0")
 
-    def _wait_for(self, tag: str, cmd_id: str, timeout_s: float) -> Record | None:
-        key = (tag, cmd_id.upper())
-        deadline = time.monotonic() + timeout_s
-        with self._cond:
-            while time.monotonic() < deadline:
-                if key in self._records:
-                    return self._records[key]
-                self._cond.wait(timeout=0.1)
-        return None
-
     # -- device queries ------------------------------------------------
     def product_id(self) -> str | None:
         rec = self.get("PRODUCT_ID")
@@ -174,22 +193,68 @@ class OpenGazeClient:
         return [gp for gp in points if gp is not None]
 
     # -- calibration ---------------------------------------------------
-    def calibrate(self, timeout_s: float = 60.0) -> tuple[float, int]:
+    def calibrate(
+        self,
+        timeout_s: float = 60.0,
+        points: Sequence[tuple[float, float]] | None = None,
+        point_timeout_s: float = 2.5,
+        point_delay_s: float = 1.0,
+    ) -> tuple[float, int]:
         """Run the tracker's own calibration; returns (ave_error, valid_points).
 
-        Drives CALIBRATE_CLEAR -> CALIBRATE_SHOW -> CALIBRATE_START, waits for
-        the CALIB_RESULT record, hides the window, then reads the summary.
+        ``points`` are ``(x, y)`` screen fractions for a custom grid (None uses
+        the device defaults). ``point_timeout_s`` is how long each point is
+        sampled and ``point_delay_s`` the animation lead-in; the defaults are
+        longer than Gazepoint's 1.5/0.5 to collect more samples per point.
+
+        Keeps the calibration window open while polling
+        CALIBRATE_RESULT_SUMMARY. The server emits an empty ``CALIB_RESULT``
+        about a second after start (plus one ``CALIB_RESULT_PT`` per point),
+        so that record is *not* a completion signal; the summary only becomes
+        non-zero once the device accepts at least one point.
         """
-        self.set("CALIBRATE_CLEAR")
-        with self._cond:
-            self._records.pop((CAL, "CALIB_RESULT"), None)
+        self.set("CALIBRATE_TIMEOUT", VALUE=f"{point_timeout_s:g}")
+        self.set("CALIBRATE_DELAY", VALUE=f"{point_delay_s:g}")
+        if points:
+            self.set("CALIBRATE_CLEAR")
+            for x, y in points:
+                self.set("CALIBRATE_ADDPOINT", X=f"{x:.5f}", Y=f"{y:.5f}")
+            accepted = int(float(self.get("CALIBRATE_ADDPOINT").attrs.get("PTS", "0")))
+            if accepted != len(points):
+                raise OpenGazeError(
+                    f"device accepted {accepted}/{len(points)} calibration points"
+                )
+        else:
+            self.set("CALIBRATE_RESET")
+            self.set("CALIBRATE_CLEAR")
+        time.sleep(0.5)  # let the clear land before the first summary read
         self.set("CALIBRATE_SHOW", STATE="1")
+        time.sleep(1.5)  # let the fullscreen calibration window appear
         self.set("CALIBRATE_START", STATE="1")
-        if self._wait_for(CAL, "CALIB_RESULT", timeout_s) is None:
+
+        deadline = time.monotonic() + timeout_s
+        summary: tuple[float, int] | None = None
+        last: tuple[float, int] | None = None
+        stable = 0
+        try:
+            while time.monotonic() < deadline:
+                try:
+                    rec = self.get("CALIBRATE_RESULT_SUMMARY")
+                except OpenGazeError:
+                    rec = None
+                current = calibration_summary(rec) if rec is not None else None
+                if current is not None and current[1] > 0:
+                    stable = stable + 1 if current == last else 0
+                    last = current
+                    if stable >= 2:  # unchanged over ~1 s -> device finished
+                        summary = current
+                        break
+                time.sleep(0.5)
+        finally:
             self.set("CALIBRATE_SHOW", STATE="0")
-            raise OpenGazeError("calibration did not finish before timeout")
-        self.set("CALIBRATE_SHOW", STATE="0")
-        summary = calibration_summary(self.get("CALIBRATE_RESULT_SUMMARY"))
+
+        if summary is None:
+            summary = calibration_summary(self.get("CALIBRATE_RESULT_SUMMARY"))
         if summary is None:
             raise OpenGazeError("CALIBRATE_RESULT_SUMMARY missing AVE_ERROR/VALID_POINTS")
         return summary
