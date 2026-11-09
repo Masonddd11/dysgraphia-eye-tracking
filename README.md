@@ -54,6 +54,12 @@ uv run fyp test
 
 Aliases: `cal`, `g`, `w`, `b`, `s`, `t`.
 
+Preview smoothing: the Gazepoint overlay uses an adaptive One Euro filter
+(`--smooth`, 0..1, default `0.4`; **lower = smoother**) plus a word-highlight
+dwell (`--word-dwell-ms`, default `120`). This removes tracker jitter without
+the lag of a fixed EMA and stops the highlight flickering between words. Both
+settings affect the preview only — LSL streams stay raw.
+
 The Gazepoint server can run on another machine:
 
 ```bash
@@ -80,7 +86,7 @@ Control calibrates against (i.e. the Windows-driven screen).
 src/fyp/webcam/      webcam pipeline (FaceMesh, calibration, switching, stimulus)
 src/fyp/gazepoint/   Gazepoint OpenGaze client + LSL + CLI
 src/fyp/cli.py       unified `fyp` entry point
-tests/               offline tests (36)
+tests/               offline tests (47)
 docs/                concept, proposal, paper chapters
 install.sh           macOS/Linux setup
 install.ps1          Windows setup

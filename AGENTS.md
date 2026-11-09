@@ -9,7 +9,7 @@ Final-year project (FYP): science-first dysgraphia screening study on an eye-tra
 Real structure landed 2026-09-08 (V1 webcam module); Gazepoint GP3 HD adapter landed 2026-10-26. Commands:
 
 - Sync env: `uv sync`
-- Tests: `uv run pytest -q` (36 offline tests: gaze calibration math, switch detector, head-pose extraction, stimulus layout + word lookup, OpenGaze protocol codec)
+- Tests: `uv run pytest -q` (47 offline tests: gaze calibration math, switch detector, head-pose extraction, stimulus layout + word lookup, preview smoothing, OpenGaze protocol codec)
 - Webcam smoke (stats only): `uv run fyp-webcam --headless --duration 8`
 - Webcam live preview (HUD + gaze dot): `uv run fyp-webcam --calibration data/calibration.json`
 - Copy-task stimulus + word-level gaze overlay: `uv run fyp-webcam --calibration data/calibration.json --stimulus data/sample_paragraph.txt`
@@ -19,7 +19,7 @@ Real structure landed 2026-09-08 (V1 webcam module); Gazepoint GP3 HD adapter la
 - Gazepoint copy-task overlay: `uv run fyp-gazepoint --stimulus data/sample_paragraph.txt`
 - Shortcuts (console script `fyp`, after `uv sync`): `uv run fyp calibrate` / `gaze` / `webcam` / `both` / `smoke` / `test` (aliases `cal g w b s t`). `fyp both --stimulus <FILE>` shows the Gazepoint overlay while the webcam records head pose; children run on the current interpreter, so no uv reinstall race.
 
-Module boundaries: `src/fyp/webcam/` — `landmarks.py` (FaceMesh + solvePnP head pose), `gaze.py` (calibration math, pure), `switching.py` (hysteresis/dwell state machine, pure), `stimulus.py` (paragraph word-wrap layout + gaze→word resolution, pure), `lsl.py` (four outlets: FYP_WebcamGaze / FYP_WebcamHeadPose / FYP_WordIndex / FYP_SwitchEvents), `cli.py` (run loop + fullscreen stimulus overlay). Pure modules must stay numpy-only and unit-tested; hardware paths are verified by live smoke runs. `src/fyp/gazepoint/` — `protocol.py` (OpenGaze XML codec + POG fraction→px, pure), `client.py` (TCP client + on-device calibration), `lsl.py` (FYP_GazePoint: x_px, y_px, valid, pupil), `cli.py` (run loop + overlay). The Gazepoint supplies gaze only; monitor↔paper switching stays on the webcam head-pose stream.
+Module boundaries: `src/fyp/webcam/` — `landmarks.py` (FaceMesh + solvePnP head pose), `gaze.py` (calibration math, pure), `switching.py` (hysteresis/dwell state machine, pure), `stimulus.py` (paragraph word-wrap layout + gaze→word resolution, pure), `lsl.py` (four outlets: FYP_WebcamGaze / FYP_WebcamHeadPose / FYP_WordIndex / FYP_SwitchEvents), `cli.py` (run loop + fullscreen stimulus overlay). Pure modules must stay numpy-only and unit-tested; hardware paths are verified by live smoke runs. `src/fyp/smoothing.py` — adaptive One Euro preview filter + word dwell (pure, display-only; never applied to LSL). `src/fyp/gazepoint/` — `protocol.py` (OpenGaze XML codec + POG fraction→px, pure), `client.py` (TCP client + on-device calibration), `lsl.py` (FYP_GazePoint: x_px, y_px, valid, pupil), `cli.py` (run loop + overlay). The Gazepoint supplies gaze only; monitor↔paper switching stays on the webcam head-pose stream.
 
 Quirks:
 

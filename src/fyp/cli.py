@@ -78,6 +78,9 @@ def _gazepoint_cmd(args: argparse.Namespace, *, with_stimulus: bool) -> list[str
         "--text-width",
         str(args.text_width),
     ]
+    if args.smooth is not None:
+        cmd += ["--smooth", str(args.smooth)]
+    cmd += ["--word-dwell-ms", str(args.word_dwell_ms)]
     stimulus = _abs(args.stimulus) if with_stimulus else None
     if stimulus:
         cmd += ["--stimulus", stimulus]
@@ -142,6 +145,7 @@ def _smoke_args() -> argparse.Namespace:
         calibration=None,
         no_calibration=False,
         smooth=None,
+        word_dwell_ms=120.0,
         host="127.0.0.1",
         port=4242,
         rate=150.0,
@@ -186,6 +190,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     gaze.add_argument(
         "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
     )
+    gaze.add_argument(
+        "--smooth",
+        type=float,
+        default=None,
+        help="Gazepoint preview smoothing 0..1 (lower = smoother)",
+    )
+    gaze.add_argument(
+        "--word-dwell-ms",
+        type=float,
+        default=120.0,
+        help="Gazepoint word highlight dwell ms",
+    )
 
     cam = sub.add_parser("webcam", aliases=["w"], help="webcam head-pose/gaze stream")
     _add_webcam_options(cam)
@@ -199,6 +215,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     both.add_argument("--rate", type=float, default=150.0)
     both.add_argument(
         "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
+    )
+    both.add_argument(
+        "--word-dwell-ms",
+        type=float,
+        default=120.0,
+        help="Gazepoint word highlight dwell ms",
     )
 
     sub.add_parser("smoke", aliases=["s"], help="both sensors, 8 s, headless")

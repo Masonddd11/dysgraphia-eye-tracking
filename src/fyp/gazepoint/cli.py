@@ -13,7 +13,9 @@ LSL carries raw (device-native) best-eye POG: x_px, y_px, valid, pupil_diameter.
 Samples are buffered and drained every loop iteration, so a slow renderer does
 not drop the 150 Hz stream. LSL timestamps come from the device TIME field
 (offset to the LSL clock), preserving the tracker's sample spacing.
-``--smooth`` affects only the on-screen preview dot/word highlight, not LSL.
+``--smooth`` drives an adaptive One Euro filter for the on-screen preview dot
+and word highlight; LSL is never smoothed. ``--word-dwell-ms`` debounces the
+highlight so it cannot flicker between words at 150 Hz.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from fyp.gazepoint.client import (
     text_area_points,
 )
 from fyp.gazepoint.lsl import GazePointOutlet
+from fyp.smoothing import OneEuroPoint, WordDwell
 from fyp.webcam.stimulus import layout_paragraph, render_paragraph, word_at
 
 _CONNECT_HELP = (
@@ -65,7 +68,18 @@ def parse_args() -> argparse.Namespace:
         help="stimulus column width px (0 = 47 percent of screen); matched by --area text",
     )
     p.add_argument("--stimulus", type=Path, default=None, help="text file with the paragraph to display")
-    p.add_argument("--smooth", type=float, default=0.6, help="preview EMA alpha (0..1); LSL stays raw")
+    p.add_argument(
+        "--smooth",
+        type=float,
+        default=0.4,
+        help="preview smoothing 0..1 (lower = smoother); LSL stays raw",
+    )
+    p.add_argument(
+        "--word-dwell-ms",
+        type=float,
+        default=120.0,
+        help="word highlight must be stable this long before it changes",
+    )
     p.add_argument("--headless", action="store_true", help="no preview window, stats to stdout")
     return p.parse_args()
 
@@ -187,7 +201,10 @@ def run_session(args: argparse.Namespace) -> int:
             cv2.setWindowProperty("stimulus", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     samples = valid_samples = 0
-    ema: np.ndarray | None = None
+    smooth = min(max(args.smooth, 0.0), 1.0)
+    smoother = OneEuroPoint(min_cutoff=0.3 + 2.7 * smooth)
+    dwell = WordDwell(max(args.word_dwell_ms, 0.0) / 1000.0)
+    smoothed: np.ndarray | None = None
     current_word = -1
     time_offset: float | None = None
     last_draw = 0.0
@@ -212,28 +229,28 @@ def run_session(args: argparse.Namespace) -> int:
                 if gp.valid:
                     valid_samples += 1
                     outlet.push(gp.x_px, gp.y_px, True, gp.pupil_diameter_px, timestamp=stamp)
-                    xy = np.array([gp.x_px, gp.y_px])
-                    ema = (
-                        xy.copy()
-                        if ema is None
-                        else args.smooth * xy + (1.0 - args.smooth) * ema
-                    )
+                    sample_t = gp.time_s if gp.time_s is not None else ts
+                    nx, ny = smoother(gp.x_px / sw, gp.y_px / sh, sample_t)
+                    smoothed = np.array([nx * sw, ny * sh])
                     if layout is not None:
-                        widx = word_at(ema, layout.boxes, word_tol)
+                        widx = word_at(smoothed, layout.boxes, word_tol)
+                        widx = dwell.update(widx, sample_t)
                         if widx != current_word and widx >= 0:
                             print(f"word {widx} '{layout.boxes[widx].text}' t={ts - t0:6.2f}s")
                         current_word = widx
                 else:
                     outlet.push(-1.0, -1.0, False, gp.pupil_diameter_px, timestamp=stamp)
-                    ema = None
+                    smoother.reset()
+                    dwell.reset()
+                    smoothed = None
                     current_word = -1
 
             if not args.headless and layout is not None and ts - last_draw >= 0.033:
                 canvas = render_paragraph(
                     (int(sw), int(sh)), layout, font, font_scale, thickness, highlight=current_word
                 )
-                if ema is not None:
-                    gx, gy = int(ema[0]), int(ema[1])
+                if smoothed is not None:
+                    gx, gy = int(smoothed[0]), int(smoothed[1])
                     cv2.circle(canvas, (gx, gy), 12, (0, 0, 255), 2)
                     cv2.circle(canvas, (gx, gy), 2, (0, 0, 255), -1)
                 cv2.imshow("stimulus", canvas)
