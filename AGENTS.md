@@ -10,7 +10,7 @@ Real structure landed 2026-09-08 (V1 webcam module); Gazepoint GP3 HD adapter la
 
 - Sync env: `uv sync`
 - Clickable launcher: `uv run fyp-launcher` (local browser control panel on `127.0.0.1:8765`; macOS wrapper `FYP Launcher.app`, Windows `launch_fyp_windows.bat`). The wrapper resolves `uv`, sets `FYP_ROOT`, and starts the same CLI subprocesses.
-- Tests: `uv run pytest -q` (62 offline tests: gaze calibration math, display layout, switch detector, head-pose extraction, stimulus layout + word lookup/margins, preview smoothing, OpenGaze protocol codec, launcher command construction)
+- Tests: `uv run pytest -q` (69 offline tests: gaze calibration math, display layout, row lock, switch detector, head-pose extraction, stimulus layout + word lookup/margins, preview smoothing, OpenGaze protocol codec, launcher command construction)
 - Webcam smoke (stats only): `uv run fyp-webcam --headless --duration 8`
 - Webcam live preview (HUD + gaze dot): `uv run fyp-webcam --calibration data/calibration.json`
 - Copy-task stimulus + word-level gaze overlay: `uv run fyp-webcam --calibration data/calibration.json --stimulus data/sample_paragraph.txt`

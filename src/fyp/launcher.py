@@ -199,6 +199,7 @@ class LauncherHandler(BaseHTTPRequestHandler):
                         "font_scale": 0.0,
                         "line_spacing": 2.2,
                         "word_margin": 0.0,
+                        "row_lock": True,
                         "host": "127.0.0.1",
                     },
                 }
@@ -277,6 +278,7 @@ class LauncherHandler(BaseHTTPRequestHandler):
         font_scale = number("font_scale", 0.0, 0.0, 4.0)
         line_spacing = number("line_spacing", 2.2, 1.0, 4.0)
         word_margin = number("word_margin", 0.0, 0.0, 200.0)
+        row_lock = bool(payload.get("row_lock", True))
         host = str(payload.get("host", "127.0.0.1")).strip() or "127.0.0.1"
 
         try:
@@ -286,6 +288,7 @@ class LauncherHandler(BaseHTTPRequestHandler):
                 font_scale=font_scale,
                 line_spacing=line_spacing,
                 word_margin=word_margin,
+                row_lock=row_lock,
                 host=host,
                 calibration=CALIBRATION,
             )

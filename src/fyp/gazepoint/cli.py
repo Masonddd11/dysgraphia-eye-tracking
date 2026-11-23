@@ -37,6 +37,7 @@ from fyp.gazepoint.client import (
 )
 from fyp.gazepoint.lsl import GazePointOutlet
 from fyp.smoothing import OneEuroPoint, WordDwell
+from fyp.webcam.rowlock import RowLock
 from fyp.webcam.stimulus import (
     auto_font_scale,
     auto_thickness,
@@ -93,6 +94,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.0,
         help="word hit margin px (0 = auto from font/line size)",
+    )
+    p.add_argument(
+        "--row-lock",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="lock word matching to the current reading row",
     )
     p.add_argument(
         "--smooth",
@@ -196,6 +203,7 @@ def run_session(args: argparse.Namespace) -> int:
 
     outlet = GazePointOutlet(args.rate)
     layout = None
+    row_lock: RowLock | None = None
     word_x_tol = word_y_tol = 0.0
     font, font_scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.0, 2
     if args.stimulus is not None:
@@ -230,14 +238,35 @@ def run_session(args: argparse.Namespace) -> int:
             word_x_tol = word_y_tol = float(args.word_margin)
         else:
             word_x_tol, word_y_tol = auto_word_margins(font_scale, layout.line_height)
+        if args.row_lock:
+            row_lock = RowLock(
+                release_px=max(12.0, layout.line_height * 0.35),
+                release_s=0.12,
+                switch_margin_px=max(2.0, layout.line_height * 0.08),
+            )
         n_lines = 1 + (layout.boxes[-1].line if layout.boxes else 0)
         print(
             f"stimulus: {len(layout.boxes)} words / {n_lines} lines from {args.stimulus} "
-            f"(column {column:.0f}px, word margin {word_x_tol:.0f}/{word_y_tol:.0f}px)"
+            f"(column {column:.0f}px, word margin {word_x_tol:.0f}/{word_y_tol:.0f}px, "
+            f"row lock {'on' if row_lock else 'off'})"
         )
         if not args.headless:
             cv2.namedWindow("stimulus", cv2.WINDOW_NORMAL)
             cv2.setWindowProperty("stimulus", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+    def resolve_word(gaze: np.ndarray, now_s: float) -> int:
+        if layout is None:
+            return -1
+        boxes = layout.boxes
+        if row_lock is not None:
+            line = row_lock.update(float(gaze[1]), boxes, now_s)
+            boxes = [box for box in boxes if box.line == line]
+        return word_at(
+            gaze,
+            boxes,
+            x_tolerance_px=word_x_tol,
+            y_tolerance_px=word_y_tol,
+        )
 
     samples = valid_samples = 0
     smooth = min(max(args.smooth, 0.0), 1.0)
@@ -272,12 +301,7 @@ def run_session(args: argparse.Namespace) -> int:
                     nx, ny = smoother(gp.x_px / sw, gp.y_px / sh, sample_t)
                     smoothed = np.array([nx * sw, ny * sh])
                     if layout is not None:
-                        widx = word_at(
-                            smoothed,
-                            layout.boxes,
-                            x_tolerance_px=word_x_tol,
-                            y_tolerance_px=word_y_tol,
-                        )
+                        widx = resolve_word(smoothed, sample_t)
                         widx = dwell.update(widx, sample_t)
                         if widx != current_word and widx >= 0:
                             print(f"word {widx} '{layout.boxes[widx].text}' t={ts - t0:6.2f}s")

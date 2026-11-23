@@ -51,10 +51,10 @@ After running `bash install.sh` once:
    **Quit launcher** stops the local server.
 
 The panel has webcam/Gazepoint modes, a stimulus-file picker, font/line-spacing
-controls and a word-hit-margin field. Settings are passed straight to the same
-CLI code. If macOS blocks the unsigned app, right-click **Open** once. Keep the
-`.app` next to the project folder; it uses the repo's `uv` environment. On
-Windows, run `launch_fyp_windows.bat` instead.
+controls, a word-hit-margin field and a **Row lock** toggle. Settings are passed
+straight to the same CLI code. If macOS blocks the unsigned app, right-click
+**Open** once. Keep the `.app` next to the project folder; it uses the repo's
+`uv` environment. On Windows, run `launch_fyp_windows.bat` instead.
 
 ## Commands
 
@@ -101,6 +101,12 @@ gap without making adjacent words ambiguous. The nearest expanded word wins
 area. A value that is too large will confuse neighbouring words, so the auto
 setting is the recommended baseline.
 
+**Row lock** is on by default. It keeps word matching on the current text line
+and only switches rows after a clear vertical movement (about 120 ms outside
+the line). This avoids horizontal gaze jitter jumping to a neighbouring line.
+Turn it off with `--no-row-lock` on `webcam`, `gaze`, `fyp-webcam` or
+`fyp-gazepoint`, or with the **Row lock** checkbox in the launcher.
+
 `fyp calibrate` now defaults to a **full-screen** 3×3 grid. Use
 `fyp calibrate --area text` if you deliberately want the grid confined to the
 reading column. After changing monitors or resolution, recalibrate:
@@ -137,7 +143,7 @@ src/fyp/launcher_commands.py  pure launcher command builder
 src/fyp/launcher_assets/      launcher HTML/CSS/JS
 FYP Launcher.app     double-click macOS launcher
 launch_fyp_windows.bat  Windows launcher
-tests/               offline tests (62)
+tests/               offline tests (69)
 docs/                concept, proposal, paper chapters
 install.sh           macOS/Linux setup
 install.ps1          Windows setup

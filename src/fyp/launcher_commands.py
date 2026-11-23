@@ -24,6 +24,7 @@ def build_command(
     font_scale: float = 0.0,
     line_spacing: float = 2.2,
     word_margin: float = 0.0,
+    row_lock: bool = True,
     host: str = "127.0.0.1",
     calibration: Path | None = None,
     python_exe: str | None = None,
@@ -62,6 +63,8 @@ def build_command(
         cmd += ["--line-spacing", str(line_spacing)]
         if word_margin > 0:
             cmd += ["--word-margin", str(word_margin)]
+        if not row_lock:
+            cmd += ["--no-row-lock"]
         return cmd
 
     # gazepoint_read
@@ -71,4 +74,6 @@ def build_command(
     cmd += ["--line-spacing", str(line_spacing)]
     if word_margin > 0:
         cmd += ["--word-margin", str(word_margin)]
+    if not row_lock:
+        cmd += ["--no-row-lock"]
     return cmd

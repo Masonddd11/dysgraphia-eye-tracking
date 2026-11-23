@@ -71,6 +71,8 @@
   .field input, .field select { width: 100%; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); padding: 7px 9px; font-size: 12px; outline: none; }
   .field input:focus, .field select:focus { border-color: #a3a3a3; box-shadow: 0 0 0 3px rgba(0,0,0,.05); }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .check { display: flex; align-items: center; gap: 7px; margin-top: 2px; color: var(--muted); font-size: 11px; cursor: pointer; }
+  .check input { width: 13px; height: 13px; margin: 0; accent-color: var(--black); }
   .foot { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 16px; }
   .foot .linkbtn { font-size: 11px; }
   @media (max-width: 780px) {
@@ -121,6 +123,7 @@
           <label class="field"><span>Line spacing</span><input id="lineSpacing" type="number" min="1" max="4" step="0.1" value="2.2"></label>
         </div>
         <label class="field"><span>Word margin</span><input id="wordMargin" type="number" min="0" max="200" step="1" value="0"></label>
+        <label class="check"><input id="rowLock" type="checkbox" checked><span>Row lock</span></label>
       </section>
 
       <section id="gazepointCard" class="card" hidden>
@@ -221,6 +224,7 @@
       $("fontScale").value = cfg.defaults?.font_scale ?? 0;
       $("lineSpacing").value = cfg.defaults?.line_spacing ?? 2.2;
       $("wordMargin").value = cfg.defaults?.word_margin ?? 0;
+      $("rowLock").checked = cfg.defaults?.row_lock ?? true;
       $("host").value = cfg.defaults?.host ?? "127.0.0.1";
     } catch (err) {
       showError(`Could not load settings: ${err.message}`);
@@ -232,6 +236,7 @@
     font_scale: Number($("fontScale").value || 0),
     line_spacing: Number($("lineSpacing").value || 2.2),
     word_margin: Number($("wordMargin").value || 0),
+    row_lock: $("rowLock").checked,
     host: $("host").value.trim() || "127.0.0.1",
   });
 

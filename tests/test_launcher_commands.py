@@ -84,6 +84,23 @@ def test_gazepoint_read_command(tmp_path):
     assert cmd[cmd.index("--word-margin") + 1] == "20"
 
 
+def test_row_lock_can_be_disabled(tmp_path):
+    stimulus, _ = _files(tmp_path)
+    cmd = build_command(
+        "webcam_read",
+        stimulus=stimulus,
+        row_lock=False,
+        python_exe=PY,
+    )
+    assert "--no-row-lock" in cmd
+
+
+def test_row_lock_is_on_by_default(tmp_path):
+    stimulus, _ = _files(tmp_path)
+    cmd = build_command("webcam_read", stimulus=stimulus, python_exe=PY)
+    assert "--no-row-lock" not in cmd
+
+
 def test_unknown_action_is_rejected(tmp_path):
     stimulus, _ = _files(tmp_path)
     with pytest.raises(ValueError):

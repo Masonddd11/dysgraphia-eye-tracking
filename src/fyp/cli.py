@@ -86,6 +86,8 @@ def _gazepoint_cmd(args: argparse.Namespace, *, with_stimulus: bool) -> list[str
     cmd += ["--line-spacing", str(getattr(args, "line_spacing", 2.2))]
     if getattr(args, "word_margin", 0.0) > 0:
         cmd += ["--word-margin", str(args.word_margin)]
+    if getattr(args, "row_lock", True) is False:
+        cmd += ["--no-row-lock"]
     stimulus = _abs(args.stimulus) if with_stimulus else None
     if stimulus:
         cmd += ["--stimulus", stimulus]
@@ -119,6 +121,8 @@ def _webcam_cmd(
     cmd += ["--line-spacing", str(getattr(args, "line_spacing", 2.2))]
     if getattr(args, "word_margin", 0.0) > 0:
         cmd += ["--word-margin", str(args.word_margin)]
+    if getattr(args, "row_lock", True) is False:
+        cmd += ["--no-row-lock"]
     return cmd
 
 
@@ -163,6 +167,7 @@ def _smoke_args() -> argparse.Namespace:
         font_scale=0.0,
         line_spacing=2.2,
         word_margin=0.0,
+        row_lock=True,
     )
 
 
@@ -181,6 +186,12 @@ def _add_webcam_options(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--word-margin", type=float, default=0.0, help="word hit margin px (0 = auto)"
+    )
+    parser.add_argument(
+        "--row-lock",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="lock word matching to the current reading row",
     )
 
 
@@ -223,6 +234,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     gaze.add_argument(
         "--word-margin", type=float, default=0.0, help="word hit margin px (0 = auto)"
+    )
+    gaze.add_argument(
+        "--row-lock",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="lock word matching to the current reading row",
     )
     gaze.add_argument(
         "--smooth",
