@@ -21,6 +21,7 @@ from fyp.webcam.lsl import WebcamOutlets
 from fyp.webcam.stimulus import (
     auto_font_scale,
     auto_thickness,
+    auto_word_margins,
     layout_paragraph,
     render_paragraph,
     word_at,
@@ -60,6 +61,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=2.2,
         help="stimulus line spacing multiplier",
+    )
+    p.add_argument(
+        "--word-margin",
+        type=float,
+        default=0.0,
+        help="word hit margin px (0 = auto from font/line size)",
     )
     p.add_argument("--smooth", type=float, default=0.35, help="gaze EMA alpha (0..1, higher=faster)")
     p.add_argument("--calibrate", action="store_true", help="run 9-point calibration and exit")
@@ -114,7 +121,8 @@ def run_session(args: argparse.Namespace) -> int:
         if cal is not None
         else resolve_screen_size(args.screen_w, args.screen_h)
     )
-    layout, word_tol = None, 0.0
+    layout = None
+    word_x_tol = word_y_tol = 0.0
     font, font_scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.0, 2
     if args.stimulus is not None:
         # Scale from the screen height, and use most of the width so the
@@ -148,11 +156,15 @@ def run_session(args: argparse.Namespace) -> int:
             shift = int(top - block_top)
             for box in layout.boxes:
                 box.y += shift
-        word_tol = layout.line_height * 0.75
+        if args.word_margin > 0:
+            word_x_tol = word_y_tol = float(args.word_margin)
+        else:
+            word_x_tol, word_y_tol = auto_word_margins(font_scale, layout.line_height)
         n_lines = 1 + (layout.boxes[-1].line if layout.boxes else 0)
         print(
             f"stimulus: {len(layout.boxes)} words / {n_lines} lines from {args.stimulus} "
-            f"(screen {screen[0]:.0f}x{screen[1]:.0f}, column {column}px)"
+            f"(screen {screen[0]:.0f}x{screen[1]:.0f}, column {column}px, "
+            f"word margin {word_x_tol:.0f}/{word_y_tol:.0f}px)"
         )
         if not args.headless:
             cv2.namedWindow("stimulus", cv2.WINDOW_NORMAL)
@@ -196,7 +208,12 @@ def run_session(args: argparse.Namespace) -> int:
                     last_valid_ts = ts
                     outlets.push_gaze(float(gaze_ema[0]), float(gaze_ema[1]), 1.0, 0.0)
                     if layout is not None:
-                        widx = word_at(gaze_ema, layout.boxes, word_tol)
+                        widx = word_at(
+                            gaze_ema,
+                            layout.boxes,
+                            x_tolerance_px=word_x_tol,
+                            y_tolerance_px=word_y_tol,
+                        )
                         outlets.push_word(widx)
                         if widx != current_word and widx >= 0:
                             print(f"word {widx} '{layout.boxes[widx].text}' t={ts - t0:6.2f}s")

@@ -75,6 +75,14 @@ default font is 1.5× the 900 px baseline (1.8 at 1080p), and line spacing is
 `fyp webcam`, `fyp gaze`, `fyp-webcam` or `fyp-gazepoint`; use a smaller column
 with `--text-width` on the Gazepoint path if the lines feel too long.
 
+Word hit-testing has its own auto margin: about **9 px horizontally / 20 px
+vertically at 1080p**, derived from the font and line spacing so it fills the
+gap without making adjacent words ambiguous. The nearest expanded word wins
+(not the first one in reading order). Override both axes with
+`--word-margin <px>` if your tracker needs a more forgiving or tighter hit
+area. A value that is too large will confuse neighbouring words, so the auto
+setting is the recommended baseline.
+
 `fyp calibrate` now defaults to a **full-screen** 3×3 grid. Use
 `fyp calibrate --area text` if you deliberately want the grid confined to the
 reading column. After changing monitors or resolution, recalibrate:

@@ -30,6 +30,16 @@ def auto_thickness(font_scale: float) -> int:
     return max(2, int(round(font_scale * 1.5)))
 
 
+def auto_word_margins(font_scale: float, line_height: float) -> tuple[float, float]:
+    """Automatic gaze-to-word hit margins (x, y) in pixels.
+
+    Word spacing controls horizontal ambiguity; line spacing controls vertical
+    ambiguity.  These values reach into the gaps without erasing the nearest-
+    word decision.
+    """
+    return max(4.0, font_scale * 5.0), max(6.0, line_height * 0.23)
+
+
 @dataclass
 class WordBox:
     text: str
@@ -84,15 +94,44 @@ def layout_paragraph(
     return LayoutResult(boxes, line_height)
 
 
-def word_at(gaze_xy: np.ndarray, boxes: list[WordBox], tolerance_px: float) -> int:
-    """Index of the first word whose (tolerance-expanded) bbox contains the point, else -1."""
+def word_at(
+    gaze_xy: np.ndarray,
+    boxes: list[WordBox],
+    tolerance_px: float = 0.0,
+    *,
+    x_tolerance_px: float | None = None,
+    y_tolerance_px: float | None = None,
+) -> int:
+    """Index of the nearest word within the hit margin, else -1.
+
+    Horizontal and vertical margins can differ: horizontal error mostly causes
+    a word to be confused with its neighbour, while vertical error is larger
+    during reading.  Taking the nearest expanded box (rather than the first
+    match in reading order) avoids biasing every ambiguous gaze point towards
+    the earlier word.
+    """
     gx, gy = float(gaze_xy[0]), float(gaze_xy[1])
+    x_tol = tolerance_px if x_tolerance_px is None else x_tolerance_px
+    y_tol = tolerance_px if y_tolerance_px is None else y_tolerance_px
+
+    best_index = -1
+    best_distance = float("inf")
     for b in boxes:
-        if (b.x - tolerance_px <= gx <= b.x + b.w + tolerance_px) and (
-            b.y - tolerance_px <= gy <= b.y + b.h + tolerance_px
-        ):
-            return b.index
-    return -1
+        left = b.x - x_tol
+        right = b.x + b.w + x_tol
+        top = b.y - y_tol
+        bottom = b.y + b.h + y_tol
+        if not (left <= gx <= right and top <= gy <= bottom):
+            continue
+
+        # Squared distance to the unexpanded word rectangle; 0 when inside.
+        dx = max(b.x - gx, 0.0, gx - (b.x + b.w))
+        dy = max(b.y - gy, 0.0, gy - (b.y + b.h))
+        distance = dx * dx + dy * dy
+        if distance < best_distance:
+            best_distance = distance
+            best_index = b.index
+    return best_index
 
 
 def render_paragraph(

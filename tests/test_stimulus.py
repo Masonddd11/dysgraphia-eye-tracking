@@ -6,6 +6,7 @@ from fyp.webcam.stimulus import (
     WordBox,
     auto_font_scale,
     auto_thickness,
+    auto_word_margins,
     layout_paragraph,
     render_paragraph,
     word_at,
@@ -42,6 +43,25 @@ def test_layout_lines_advance_downward():
         y_prev = max(b.y + b.h for b in layout.boxes if b.line == prev)
         y_next = min(b.y for b in layout.boxes if b.line == nxt)
         assert y_next >= y_prev  # next line starts below previous line's extent
+
+
+def test_word_at_prefers_nearest_expanded_box():
+    boxes = [
+        WordBox("aa", 0, 10, 100, 50, 30, line=0),
+        WordBox("bb", 1, 80, 100, 50, 30, line=0),
+    ]
+    # Both expanded boxes contain x=72; bb is closer to the point.
+    assert word_at((72.0, 110.0), boxes, tolerance_px=30.0) == 1
+
+
+def test_word_at_can_use_different_x_and_y_margins():
+    boxes = [
+        WordBox("aa", 0, 100, 100, 60, 30, line=0),
+        WordBox("bb", 1, 200, 100, 60, 30, line=0),
+    ]
+    gap_point = (180.0, 115.0)
+    assert word_at(gap_point, boxes, x_tolerance_px=0.0, y_tolerance_px=30.0) == -1
+    assert word_at(gap_point, boxes, x_tolerance_px=30.0, y_tolerance_px=30.0) in (0, 1)
 
 
 def test_word_at_containment_tolerance_and_miss():
@@ -81,3 +101,11 @@ def test_auto_font_scale_is_larger_on_1080p():
 def test_auto_thickness_tracks_font_scale():
     assert auto_thickness(1.0) == 2
     assert auto_thickness(1.8) == 3
+
+
+def test_auto_word_margins_are_tighter_than_old_line_height_margin():
+    x_tol, y_tol = auto_word_margins(1.8, 75.0)
+    assert x_tol == 9.0
+    assert y_tol == 17.25
+    assert x_tol < 75.0 * 0.75
+    assert y_tol < 75.0 * 0.75
