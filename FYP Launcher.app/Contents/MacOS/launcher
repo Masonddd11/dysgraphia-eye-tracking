@@ -1,0 +1,33 @@
+#!/bin/bash
+set -euo pipefail
+
+# Finder launches apps with a minimal PATH, so resolve uv explicitly.
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$ROOT"
+export FYP_ROOT="$ROOT"
+
+UV=""
+for candidate in \
+  "${HOME}/.local/bin/uv" \
+  "/opt/homebrew/bin/uv" \
+  "/usr/local/bin/uv" \
+  "${HOME}/.cargo/bin/uv" \
+  "$(command -v uv 2>/dev/null || true)"
+do
+  if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+    UV="$candidate"
+    break
+  fi
+done
+
+if [ -z "$UV" ]; then
+  osascript -e 'display alert "FYP Launcher" message "Cannot find uv. Run install.sh once from the project folder, then open this app again."'
+  exit 1
+fi
+
+"$UV" run fyp-launcher
+status=$?
+if [ "$status" -ne 0 ]; then
+  osascript -e 'display alert "FYP Launcher stopped" message "The launcher could not start. Run bash install.sh in the project folder, then try again."'
+fi
+exit "$status"

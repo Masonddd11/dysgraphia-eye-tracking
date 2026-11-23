@@ -13,6 +13,7 @@ dependencies = [
 fyp = "fyp.cli:main"
 fyp-webcam = "fyp.webcam.cli:main"
 fyp-gazepoint = "fyp.gazepoint.cli:main"
+fyp-launcher = "fyp.launcher:main"
 
 [build-system]
 requires = ["hatchling"]

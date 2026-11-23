@@ -39,6 +39,23 @@ uv sync
 uv run fyp test
 ```
 
+## Clickable launcher (macOS)
+
+After running `bash install.sh` once:
+
+1. Double-click **`FYP Launcher.app`** in the project folder.
+2. A local control panel opens in your browser at `http://127.0.0.1:8765`.
+3. Click **Calibrate**, then **Start reading task**. The existing OpenCV windows
+   still open full-screen; the launcher just replaces the terminal commands.
+4. Use **Stop current session** or press `ESC` in the OpenCV window when done.
+   **Quit launcher** stops the local server.
+
+The panel has webcam/Gazepoint modes, a stimulus-file picker, font/line-spacing
+controls and a word-hit-margin field. Settings are passed straight to the same
+CLI code. If macOS blocks the unsigned app, right-click **Open** once. Keep the
+`.app` next to the project folder; it uses the repo's `uv` environment. On
+Windows, run `launch_fyp_windows.bat` instead.
+
 ## Commands
 
 `uv run fyp ...` is the entry point (or just `fyp ...` if the venv is active):
@@ -51,6 +68,7 @@ uv run fyp test
 | `fyp both --stimulus data/sample_paragraph.txt` | webcam head pose + Gazepoint gaze |
 | `fyp smoke` | both sensors, 8 s, headless |
 | `fyp test` | offline test suite |
+| `fyp-launcher` | clickable local control panel (usually started by `FYP Launcher.app`) |
 
 Aliases: `cal`, `g`, `w`, `b`, `s`, `t`.
 
@@ -114,7 +132,12 @@ Control calibrates against (i.e. the Windows-driven screen).
 src/fyp/webcam/      webcam pipeline (FaceMesh, calibration, switching, stimulus)
 src/fyp/gazepoint/   Gazepoint OpenGaze client + LSL + CLI
 src/fyp/cli.py       unified `fyp` entry point
-tests/               offline tests (47)
+src/fyp/launcher.py  local browser control panel
+src/fyp/launcher_commands.py  pure launcher command builder
+src/fyp/launcher_assets/      launcher HTML/CSS/JS
+FYP Launcher.app     double-click macOS launcher
+launch_fyp_windows.bat  Windows launcher
+tests/               offline tests (62)
 docs/                concept, proposal, paper chapters
 install.sh           macOS/Linux setup
 install.ps1          Windows setup
