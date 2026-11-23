@@ -69,6 +69,12 @@ sit at 8% / 50% / 92% of the display, so they reach the edges instead of forming
 a central cluster. The reading passage uses 86% of the width (82% for Gazepoint)
 and is centred vertically.
 
+The reading text is deliberately large for word-level gaze resolution: the
+default font is 1.5× the 900 px baseline (1.8 at 1080p), and line spacing is
+2.2×. Override either with `--font-scale 1.6` / `--line-spacing 2.4` on
+`fyp webcam`, `fyp gaze`, `fyp-webcam` or `fyp-gazepoint`; use a smaller column
+with `--text-width` on the Gazepoint path if the lines feel too long.
+
 `fyp calibrate` now defaults to a **full-screen** 3×3 grid. Use
 `fyp calibrate --area text` if you deliberately want the grid confined to the
 reading column. After changing monitors or resolution, recalibrate:

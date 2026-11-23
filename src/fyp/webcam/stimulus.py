@@ -14,6 +14,21 @@ import numpy as np
 
 _FONT = cv2.FONT_HERSHEY_SIMPLEX
 
+# Reading text is intentionally large: bigger glyphs and generous line spacing
+# give the word-level gaze classifier larger, cleaner hit regions.
+DEFAULT_FONT_HEIGHT_RATIO = 1.5
+DEFAULT_LINE_SPACING = 2.2
+
+
+def auto_font_scale(screen_height: float) -> float:
+    """Font scale that keeps the passage large on the current display."""
+    return max(1.0, DEFAULT_FONT_HEIGHT_RATIO * screen_height / 900.0)
+
+
+def auto_thickness(font_scale: float) -> int:
+    """Stroke width that stays proportional to the enlarged font."""
+    return max(2, int(round(font_scale * 1.5)))
+
 
 @dataclass
 class WordBox:

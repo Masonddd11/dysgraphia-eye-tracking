@@ -37,7 +37,13 @@ from fyp.gazepoint.client import (
 )
 from fyp.gazepoint.lsl import GazePointOutlet
 from fyp.smoothing import OneEuroPoint, WordDwell
-from fyp.webcam.stimulus import layout_paragraph, render_paragraph, word_at
+from fyp.webcam.stimulus import (
+    auto_font_scale,
+    auto_thickness,
+    layout_paragraph,
+    render_paragraph,
+    word_at,
+)
 
 _CONNECT_HELP = (
     "ERROR: OpenGaze server not reachable on {host}:{port}. Gazepoint Control "
@@ -69,6 +75,18 @@ def parse_args() -> argparse.Namespace:
         help="stimulus column width px (0 = 82 percent of screen)",
     )
     p.add_argument("--stimulus", type=Path, default=None, help="text file with the paragraph to display")
+    p.add_argument(
+        "--font-scale",
+        type=float,
+        default=0.0,
+        help="stimulus font scale (0 = auto from screen height)",
+    )
+    p.add_argument(
+        "--line-spacing",
+        type=float,
+        default=2.2,
+        help="stimulus line spacing multiplier",
+    )
     p.add_argument(
         "--smooth",
         type=float,
@@ -174,7 +192,8 @@ def run_session(args: argparse.Namespace) -> int:
     word_tol = 0.0
     font, font_scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.0, 2
     if args.stimulus is not None:
-        font_scale = max(0.8, 1.0 * sh / 900.0)
+        font_scale = args.font_scale if args.font_scale > 0 else auto_font_scale(sh)
+        thickness = auto_thickness(font_scale)
         column = args.text_width if args.text_width > 0 else int(sw * DEFAULT_TEXT_WIDTH_FRACTION)
         column = max(200, min(int(sw), column))
         margin_x = (int(sw) - column) // 2
@@ -185,13 +204,19 @@ def run_session(args: argparse.Namespace) -> int:
             thickness,
             int(sw),
             margin_x,
-            line_spacing=1.9,
+            line_spacing=args.line_spacing,
             top_px=0,
         )
         if layout.boxes:
             block_top = min(b.y for b in layout.boxes)
             block_bottom = max(b.y + b.h for b in layout.boxes)
-            offset = int((sh - (block_bottom - block_top)) / 2 - block_top)
+            block_h = block_bottom - block_top
+            if block_h > sh * 0.88:
+                print(
+                    "WARNING: the passage is taller than the display; "
+                    "lower --font-scale or --line-spacing."
+                )
+            offset = int((sh - block_h) / 2 - block_top)
             for box in layout.boxes:
                 box.y += offset
         word_tol = layout.line_height * 0.75

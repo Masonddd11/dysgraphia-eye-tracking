@@ -18,7 +18,13 @@ from fyp.screen import resolve_screen_size
 from fyp.webcam.gaze import Calibration, fit_calibration, gaze_error_px, map_gaze
 from fyp.webcam.landmarks import FaceTracker
 from fyp.webcam.lsl import WebcamOutlets
-from fyp.webcam.stimulus import layout_paragraph, render_paragraph, word_at
+from fyp.webcam.stimulus import (
+    auto_font_scale,
+    auto_thickness,
+    layout_paragraph,
+    render_paragraph,
+    word_at,
+)
 from fyp.webcam.switching import MONITOR, SwitchConfig, SwitchDetector
 
 _CAMERA_HELP = (
@@ -43,6 +49,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--headless", action="store_true", help="no preview windows, stats to stdout")
     p.add_argument("--calibration", type=Path, default=None, help="calibration JSON to load")
     p.add_argument("--stimulus", type=Path, default=None, help="text file with the paragraph to display")
+    p.add_argument(
+        "--font-scale",
+        type=float,
+        default=0.0,
+        help="stimulus font scale (0 = auto from screen height)",
+    )
+    p.add_argument(
+        "--line-spacing",
+        type=float,
+        default=2.2,
+        help="stimulus line spacing multiplier",
+    )
     p.add_argument("--smooth", type=float, default=0.35, help="gaze EMA alpha (0..1, higher=faster)")
     p.add_argument("--calibrate", action="store_true", help="run 9-point calibration and exit")
     p.add_argument(
@@ -101,7 +119,10 @@ def run_session(args: argparse.Namespace) -> int:
     if args.stimulus is not None:
         # Scale from the screen height, and use most of the width so the
         # passage reads as a full-screen stimulus on a 1080p laptop.
-        font_scale = max(0.8, 1.0 * screen[1] / 900.0)
+        font_scale = (
+            args.font_scale if args.font_scale > 0 else auto_font_scale(screen[1])
+        )
+        thickness = auto_thickness(font_scale)
         column = int(screen[0] * STIMULUS_WIDTH_FRACTION)
         margin_x = max(0, (int(screen[0]) - column) // 2)
         layout = layout_paragraph(
@@ -111,13 +132,18 @@ def run_session(args: argparse.Namespace) -> int:
             thickness,
             int(screen[0]),
             margin_x,
-            line_spacing=1.9,
+            line_spacing=args.line_spacing,
             top_px=0,
         )
         if layout.boxes:
             block_top = min(b.y for b in layout.boxes)
             block_bottom = max(b.y + b.h for b in layout.boxes)
             block_h = block_bottom - block_top
+            if block_h > screen[1] * 0.88:
+                print(
+                    "WARNING: the passage is taller than the display; "
+                    "lower --font-scale or --line-spacing."
+                )
             top = max(int(screen[1] * 0.06), int((screen[1] - block_h) / 2))
             shift = int(top - block_top)
             for box in layout.boxes:

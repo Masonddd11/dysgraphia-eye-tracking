@@ -81,6 +81,9 @@ def _gazepoint_cmd(args: argparse.Namespace, *, with_stimulus: bool) -> list[str
     if args.smooth is not None:
         cmd += ["--smooth", str(args.smooth)]
     cmd += ["--word-dwell-ms", str(args.word_dwell_ms)]
+    if getattr(args, "font_scale", 0.0) > 0:
+        cmd += ["--font-scale", str(args.font_scale)]
+    cmd += ["--line-spacing", str(getattr(args, "line_spacing", 2.2))]
     stimulus = _abs(args.stimulus) if with_stimulus else None
     if stimulus:
         cmd += ["--stimulus", stimulus]
@@ -109,6 +112,9 @@ def _webcam_cmd(
         cmd += ["--headless"]
     if args.smooth is not None:
         cmd += ["--smooth", str(args.smooth)]
+    if getattr(args, "font_scale", 0.0) > 0:
+        cmd += ["--font-scale", str(args.font_scale)]
+    cmd += ["--line-spacing", str(getattr(args, "line_spacing", 2.2))]
     return cmd
 
 
@@ -150,6 +156,8 @@ def _smoke_args() -> argparse.Namespace:
         port=4242,
         rate=150.0,
         text_width=0,
+        font_scale=0.0,
+        line_spacing=2.2,
     )
 
 
@@ -160,6 +168,12 @@ def _add_webcam_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--calibration", type=Path, default=None, help="webcam calibration JSON")
     parser.add_argument("--no-calibration", action="store_true", help="ignore data/calibration.json")
     parser.add_argument("--smooth", type=float, default=None, help="webcam gaze EMA alpha (0..1)")
+    parser.add_argument(
+        "--font-scale", type=float, default=0.0, help="stimulus font scale (0 = auto)"
+    )
+    parser.add_argument(
+        "--line-spacing", type=float, default=2.2, help="stimulus line spacing multiplier"
+    )
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -192,6 +206,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     gaze.add_argument("--rate", type=float, default=150.0, help="LSL nominal rate (GP3 HD = 150)")
     gaze.add_argument(
         "--text-width", type=int, default=0, help="text column width px (0 = 82 percent of screen)"
+    )
+    gaze.add_argument(
+        "--font-scale", type=float, default=0.0, help="stimulus font scale (0 = auto)"
+    )
+    gaze.add_argument(
+        "--line-spacing", type=float, default=2.2, help="stimulus line spacing multiplier"
     )
     gaze.add_argument(
         "--smooth",

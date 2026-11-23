@@ -2,7 +2,14 @@
 
 import cv2
 
-from fyp.webcam.stimulus import WordBox, layout_paragraph, render_paragraph, word_at
+from fyp.webcam.stimulus import (
+    WordBox,
+    auto_font_scale,
+    auto_thickness,
+    layout_paragraph,
+    render_paragraph,
+    word_at,
+)
 
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 TEXT = "the quick brown fox jumps over the lazy dog " * 3
@@ -63,3 +70,14 @@ def test_render_paragraph_draws_words_and_highlight():
 def test_layout_top_px_overrides_vertical_origin():
     layout = layout_paragraph(TEXT, FONT, 1.0, 2, 400, 20, top_px=300)
     assert min(b.y for b in layout.boxes) == 300
+
+
+def test_auto_font_scale_is_larger_on_1080p():
+    assert auto_font_scale(1080) == 1.8
+    assert auto_font_scale(720) == 1.2
+    assert auto_font_scale(600) == 1.0  # floor
+
+
+def test_auto_thickness_tracks_font_scale():
+    assert auto_thickness(1.0) == 2
+    assert auto_thickness(1.8) == 3
