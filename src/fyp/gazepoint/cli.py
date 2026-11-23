@@ -32,6 +32,7 @@ from fyp.gazepoint.client import (
     DEFAULT_TEXT_WIDTH_FRACTION,
     OpenGazeClient,
     OpenGazeError,
+    full_area_points,
     text_area_points,
 )
 from fyp.gazepoint.lsl import GazePointOutlet
@@ -58,14 +59,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--area",
         choices=("text", "full"),
-        default="text",
-        help="calibration grid: centred text column (default) or full screen",
+        default="full",
+        help="calibration grid: full screen (default) or centred text column",
     )
     p.add_argument(
         "--text-width",
         type=int,
         default=0,
-        help="stimulus column width px (0 = 47 percent of screen); matched by --area text",
+        help="stimulus column width px (0 = 82 percent of screen)",
     )
     p.add_argument("--stimulus", type=Path, default=None, help="text file with the paragraph to display")
     p.add_argument(
@@ -111,7 +112,6 @@ def run_calibration(args: argparse.Namespace) -> int:
     try:
         pid = client.product_id()
         print(f"tracker: {pid or 'unknown'}")
-        points = None
         if args.area == "text":
             resolved = _resolve_screen(client, args)
             if resolved is None:
@@ -119,6 +119,9 @@ def run_calibration(args: argparse.Namespace) -> int:
                 return 2
             points = text_area_points(resolved[0], args.text_width)
             print(f"calibration area: centred text column, {len(points)} points")
+        else:
+            points = full_area_points()
+            print(f"calibration area: full screen, {len(points)} points")
         print("calibration: fixate each on-screen point; sit at the normal reading distance.")
         ave_error, valid_points = client.calibrate(points=points)
         print(
@@ -171,7 +174,7 @@ def run_session(args: argparse.Namespace) -> int:
     word_tol = 0.0
     font, font_scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.0, 2
     if args.stimulus is not None:
-        font_scale = 0.9 * sh / 900.0
+        font_scale = max(0.8, 1.0 * sh / 900.0)
         column = args.text_width if args.text_width > 0 else int(sw * DEFAULT_TEXT_WIDTH_FRACTION)
         column = max(200, min(int(sw), column))
         margin_x = (int(sw) - column) // 2
@@ -182,6 +185,7 @@ def run_session(args: argparse.Namespace) -> int:
             thickness,
             int(sw),
             margin_x,
+            line_spacing=1.9,
             top_px=0,
         )
         if layout.boxes:

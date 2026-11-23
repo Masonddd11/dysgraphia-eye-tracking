@@ -60,6 +60,20 @@ dwell (`--word-dwell-ms`, default `120`). This removes tracker jitter without
 the lag of a fixed EMA and stops the highlight flickering between words. Both
 settings affect the preview only — LSL streams stay raw.
 
+### Screen layout on a laptop
+
+The webcam calibration and stimulus detect the main display automatically.
+There is no need to pass `--screen-w/--screen-h`; they remain available as
+overrides for an external monitor or a virtual desktop. The 9 calibration dots
+sit at 8% / 50% / 92% of the display, so they reach the edges instead of forming
+a central cluster. The reading passage uses 86% of the width (82% for Gazepoint)
+and is centred vertically.
+
+`fyp calibrate` now defaults to a **full-screen** 3×3 grid. Use
+`fyp calibrate --area text` if you deliberately want the grid confined to the
+reading column. After changing monitors or resolution, recalibrate:
+`uv run fyp-webcam --calibrate` or `uv run fyp calibrate`.
+
 The Gazepoint server can run on another machine:
 
 ```bash

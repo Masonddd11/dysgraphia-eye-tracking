@@ -14,6 +14,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from fyp.screen import resolve_screen_size
 from fyp.webcam.gaze import Calibration, fit_calibration, gaze_error_px, map_gaze
 from fyp.webcam.landmarks import FaceTracker
 from fyp.webcam.lsl import WebcamOutlets
@@ -25,6 +26,12 @@ _CAMERA_HELP = (
     "running this command (System Settings -> Privacy & Security -> Camera, "
     "e.g. Terminal/iTerm), then rerun."
 )
+
+# Calibration points sit near the display edges so the fitted gaze map covers
+# the whole screen, not just a central column.  The reading stimulus uses most
+# of the width but keeps a small margin so glyphs do not touch the bezel.
+CALIBRATION_FRACS = (0.08, 0.50, 0.92)
+STIMULUS_WIDTH_FRACTION = 0.86
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,8 +57,8 @@ def parse_args() -> argparse.Namespace:
         help="seconds per calibration point (0.7s settle, rest collects samples)",
     )
     p.add_argument("--out", type=Path, default=Path("data/calibration.json"))
-    p.add_argument("--screen-w", type=int, default=1440)
-    p.add_argument("--screen-h", type=int, default=900)
+    p.add_argument("--screen-w", type=int, default=0, help="display width px (0 = detect)")
+    p.add_argument("--screen-h", type=int, default=0, help="display height px (0 = detect)")
     p.add_argument("--enter-deg", type=float, default=18.0)
     p.add_argument("--exit-deg", type=float, default=12.0)
     p.add_argument("--dwell-ms", type=float, default=200.0)
@@ -76,23 +83,51 @@ def run_session(args: argparse.Namespace) -> int:
     if args.calibration:
         cal = Calibration.from_json(args.calibration.read_text())
         print(f"loaded calibration screen={cal.screen} from {args.calibration}")
+        detected = resolve_screen_size(0, 0)
+        if abs(cal.screen[0] - detected[0]) > 1 or abs(cal.screen[1] - detected[1]) > 1:
+            print(
+                f"WARNING: calibration was captured for {cal.screen[0]:.0f}x"
+                f"{cal.screen[1]:.0f}, but this display is {detected[0]:.0f}x"
+                f"{detected[1]:.0f}. Recalibrate on this display for accurate word gaze."
+            )
 
-    screen = cal.screen if cal is not None else (float(args.screen_w), float(args.screen_h))
+    screen = (
+        cal.screen
+        if cal is not None
+        else resolve_screen_size(args.screen_w, args.screen_h)
+    )
     layout, word_tol = None, 0.0
     font, font_scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.0, 2
     if args.stimulus is not None:
-        font_scale = 0.9 * screen[1] / 900.0
+        # Scale from the screen height, and use most of the width so the
+        # passage reads as a full-screen stimulus on a 1080p laptop.
+        font_scale = max(0.8, 1.0 * screen[1] / 900.0)
+        column = int(screen[0] * STIMULUS_WIDTH_FRACTION)
+        margin_x = max(0, (int(screen[0]) - column) // 2)
         layout = layout_paragraph(
             args.stimulus.read_text(),
             font,
             font_scale,
             thickness,
             int(screen[0]),
-            int(screen[0] * 0.08),
+            margin_x,
+            line_spacing=1.9,
+            top_px=0,
         )
+        if layout.boxes:
+            block_top = min(b.y for b in layout.boxes)
+            block_bottom = max(b.y + b.h for b in layout.boxes)
+            block_h = block_bottom - block_top
+            top = max(int(screen[1] * 0.06), int((screen[1] - block_h) / 2))
+            shift = int(top - block_top)
+            for box in layout.boxes:
+                box.y += shift
         word_tol = layout.line_height * 0.75
         n_lines = 1 + (layout.boxes[-1].line if layout.boxes else 0)
-        print(f"stimulus: {len(layout.boxes)} words / {n_lines} lines from {args.stimulus}")
+        print(
+            f"stimulus: {len(layout.boxes)} words / {n_lines} lines from {args.stimulus} "
+            f"(screen {screen[0]:.0f}x{screen[1]:.0f}, column {column}px)"
+        )
         if not args.headless:
             cv2.namedWindow("stimulus", cv2.WINDOW_NORMAL)
             cv2.setWindowProperty("stimulus", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -240,7 +275,7 @@ def camera_inset_rect(screen_wh: tuple[int, int]) -> tuple[int, int, int, int]:
     inset_w = min(320, int(0.4 * w) - 80)
     inset_w = max(inset_w, 1)
     inset_h = inset_w * 9 // 16
-    gap_mid = int(0.3 * w)
+    gap_mid = int((CALIBRATION_FRACS[0] + CALIBRATION_FRACS[1]) / 2 * w)
     x = max(0, gap_mid - inset_w // 2)
     y = max(0, h - inset_h - 10)
     return x, y, inset_w, inset_h
@@ -252,9 +287,14 @@ def run_calibration(args: argparse.Namespace) -> int:
         print(_CAMERA_HELP)
         return 2
     tracker = FaceTracker()
-    screen = (float(args.screen_w), float(args.screen_h))
-    fracs = (0.1, 0.5, 0.9)
+    screen = resolve_screen_size(args.screen_w, args.screen_h)
+    fracs = CALIBRATION_FRACS
     targets = [(fx * screen[0], fy * screen[1]) for fy in fracs for fx in fracs]
+    dot_radius = max(12, int(min(screen) * 0.02))
+    print(
+        f"calibration canvas: {screen[0]:.0f}x{screen[1]:.0f} px; "
+        f"dots at {', '.join(f'{100 * f:.0f}%' for f in fracs)}"
+    )
     samples: list[tuple[np.ndarray, np.ndarray]] = []
     print("9-point calibration: look at each dot. Do not move your head, only your eyes.")
     cv2.namedWindow("calibration", cv2.WINDOW_NORMAL)
@@ -270,14 +310,28 @@ def run_calibration(args: argparse.Namespace) -> int:
                 frame = cv2.flip(frame, 1)
                 r = tracker.process(frame, time.perf_counter())
                 canvas = np.zeros((int(screen[1]), int(screen[0]), 3), dtype=np.uint8)
-                cv2.circle(canvas, (int(tx), int(ty)), 18, (0, 255, 0), -1)
+                cv2.circle(canvas, (int(tx), int(ty)), dot_radius, (0, 255, 0), -1)
+                cv2.circle(
+                    canvas,
+                    (int(tx), int(ty)),
+                    dot_radius + max(6, dot_radius // 2),
+                    (0, 120, 0),
+                    2,
+                )
                 ix, iy, iw, ih = camera_inset_rect((int(screen[0]), int(screen[1])))
                 canvas[iy : iy + ih, ix : ix + iw] = cv2.resize(frame, (iw, ih))
                 remaining = max(args.calibration_seconds - dwell, 0.0)
+                instruction = (
+                    f"point {idx + 1}/9 - look at the dot - "
+                    f"next in {remaining:.1f}s (SPACE to skip)"
+                )
+                (tw, th), _ = cv2.getTextSize(
+                    instruction, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2
+                )
                 cv2.putText(
                     canvas,
-                    f"point {idx + 1}/9 - look at the dot - next in {remaining:.1f}s (SPACE to skip)",
-                    (350, 40),
+                    instruction,
+                    (max(10, (int(screen[0]) - tw) // 2), max(30, th + 12)),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.8,
                     (255, 255, 255),

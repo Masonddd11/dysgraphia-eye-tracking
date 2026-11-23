@@ -1,6 +1,10 @@
-"""Tests for the text-column calibration grid (pure math, no hardware)."""
+"""Tests for the full-screen and text-column calibration grids (pure math)."""
 
-from fyp.gazepoint.client import DEFAULT_TEXT_WIDTH_FRACTION, text_area_points
+from fyp.gazepoint.client import (
+    DEFAULT_TEXT_WIDTH_FRACTION,
+    full_area_points,
+    text_area_points,
+)
 
 
 def test_text_area_grid_is_nine_points_inside_the_column():
@@ -25,3 +29,13 @@ def test_text_area_grid_clamps_absurd_width():
 
 def test_text_area_grid_starts_at_centre():
     assert text_area_points(3440.0)[0] == (0.5, 0.5)
+
+
+def test_full_area_grid_reaches_the_edges():
+    points = full_area_points()
+    assert len(points) == 9
+    xs = [x for x, _ in points]
+    ys = [y for _, y in points]
+    assert min(xs) <= 0.08 + 1e-9 and max(xs) >= 0.92 - 1e-9
+    assert min(ys) <= 0.08 + 1e-9 and max(ys) >= 0.92 - 1e-9
+    assert points[0] == (0.5, 0.5)  # centre first, like Gazepoint's default order

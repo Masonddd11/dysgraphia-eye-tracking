@@ -9,11 +9,11 @@ Final-year project (FYP): science-first dysgraphia screening study on an eye-tra
 Real structure landed 2026-09-08 (V1 webcam module); Gazepoint GP3 HD adapter landed 2026-10-26. Commands:
 
 - Sync env: `uv sync`
-- Tests: `uv run pytest -q` (47 offline tests: gaze calibration math, switch detector, head-pose extraction, stimulus layout + word lookup, preview smoothing, OpenGaze protocol codec)
+- Tests: `uv run pytest -q` (51 offline tests: gaze calibration math, display layout, switch detector, head-pose extraction, stimulus layout + word lookup, preview smoothing, OpenGaze protocol codec)
 - Webcam smoke (stats only): `uv run fyp-webcam --headless --duration 8`
 - Webcam live preview (HUD + gaze dot): `uv run fyp-webcam --calibration data/calibration.json`
 - Copy-task stimulus + word-level gaze overlay: `uv run fyp-webcam --calibration data/calibration.json --stimulus data/sample_paragraph.txt`
-- 9-point gaze calibration: `uv run fyp-webcam --calibrate --screen-w <W> --screen-h <H> --out data/calibration.json`
+- 9-point gaze calibration: `uv run fyp-webcam --calibrate --out data/calibration.json` (auto-detects the display; `--screen-w/--screen-h` are optional overrides)
 - Gazepoint calibration (GP3 HD, requires Gazepoint Control): `uv run fyp-gazepoint --calibrate`
 - Gazepoint gaze smoke to LSL (150 Hz): `uv run fyp-gazepoint --headless --duration 8`
 - Gazepoint copy-task overlay: `uv run fyp-gazepoint --stimulus data/sample_paragraph.txt`

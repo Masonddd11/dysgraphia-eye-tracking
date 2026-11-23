@@ -29,9 +29,13 @@ from fyp.gazepoint.protocol import (
 _ACK_TIMEOUT_S = 5.0
 _SAMPLE_BUFFER = 6000  # ~40 s at 150 Hz
 
-DEFAULT_TEXT_WIDTH_FRACTION = 0.47  # centred stimulus column vs screen width
+DEFAULT_TEXT_WIDTH_FRACTION = 0.82  # stimulus column vs screen width
 _CALIBRATION_ROWS = (0.30, 0.50, 0.70)
 _CALIBRATION_INSET = 0.10
+_FULL_CALIBRATION = (0.08, 0.50, 0.92)
+# Gazepoint's default order is centre first, then clockwise from top-right;
+# match it so the UI and the fitted samples stay index-aligned.
+_CALIBRATION_ORDER = ((1, 1), (2, 0), (2, 1), (2, 2), (1, 2), (0, 2), (0, 1), (0, 0), (1, 0))
 
 
 class OpenGazeError(RuntimeError):
@@ -57,10 +61,14 @@ def text_area_points(
         0.5 + column / 2 - _CALIBRATION_INSET * column,
     )
     ys = _CALIBRATION_ROWS
-    # Gazepoint's default order is centre first, then clockwise from top-right;
-    # match it so the UI and the fitted samples stay index-aligned.
-    order = ((1, 1), (2, 0), (2, 1), (2, 2), (1, 2), (0, 2), (0, 1), (0, 0), (1, 0))
-    return [(min(max(xs[c], 0.05), 0.95), ys[r]) for c, r in order]
+    return [(min(max(xs[c], 0.05), 0.95), ys[r]) for c, r in _CALIBRATION_ORDER]
+
+
+def full_area_points() -> list[tuple[float, float]]:
+    """3x3 calibration grid spanning the whole display (screen fractions)."""
+    xs = _FULL_CALIBRATION
+    ys = _FULL_CALIBRATION
+    return [(xs[c], ys[r]) for c, r in _CALIBRATION_ORDER]
 
 
 class OpenGazeClient:

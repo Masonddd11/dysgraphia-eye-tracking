@@ -174,10 +174,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     cal.add_argument("--host", default="127.0.0.1")
     cal.add_argument("--port", type=int, default=4242)
     cal.add_argument(
-        "--area", choices=("text", "full"), default="text", help="calibration grid area"
+        "--area",
+        choices=("text", "full"),
+        default="full",
+        help="calibration grid area (default full screen)",
     )
     cal.add_argument(
-        "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
+        "--text-width", type=int, default=0, help="text column width px (0 = 82 percent of screen)"
     )
 
     gaze = sub.add_parser("gaze", aliases=["g"], help="Gazepoint gaze stream (research tracker)")
@@ -188,7 +191,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     gaze.add_argument("--port", type=int, default=4242)
     gaze.add_argument("--rate", type=float, default=150.0, help="LSL nominal rate (GP3 HD = 150)")
     gaze.add_argument(
-        "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
+        "--text-width", type=int, default=0, help="text column width px (0 = 82 percent of screen)"
     )
     gaze.add_argument(
         "--smooth",
@@ -214,7 +217,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     both.add_argument("--port", type=int, default=4242)
     both.add_argument("--rate", type=float, default=150.0)
     both.add_argument(
-        "--text-width", type=int, default=0, help="text column width px (0 = 47 percent of screen)"
+        "--text-width", type=int, default=0, help="text column width px (0 = 82 percent of screen)"
     )
     both.add_argument(
         "--word-dwell-ms",

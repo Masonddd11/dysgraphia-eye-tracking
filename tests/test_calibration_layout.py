@@ -5,8 +5,8 @@ import pytest
 from fyp.webcam.cli import camera_inset_rect
 
 RESOLUTIONS = [(1024, 768), (1280, 800), (1440, 900), (1512, 982), (1920, 1080)]
-FRACS = (0.1, 0.5, 0.9)
-DOT_RADIUS = 18
+FRACS = (0.08, 0.5, 0.92)
+DOT_RADIUS = 24
 PAD = 12
 
 
