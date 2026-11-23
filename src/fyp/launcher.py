@@ -301,7 +301,7 @@ def _existing_launcher(port: int) -> bool:
 
     try:
         with urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/api/status", timeout=0.4
+            f"http://127.0.0.1:{port}/api/status", timeout=0.15
         ) as response:
             data = json.loads(response.read().decode("utf-8"))
             return data.get("app") == "fyp-launcher"
@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args(argv)
 
-    for port in range(args.port, args.port + 12):
+    for port in range(args.port, args.port + 3):
         if _existing_launcher(port):
             url = f"http://127.0.0.1:{port}/"
             if not args.no_browser:
